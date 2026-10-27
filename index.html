@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Kanban Board</title>
+    <meta
+      name="description"
+      content="A Kanban board that runs in your browser: drag and drop with mouse, touch or keyboard, WIP limits, labels, due dates, checklists, undo/redo, search and JSON import/export."
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="color-scheme" content="dark" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Kanban Board" />
+    <meta
+      property="og:description"
+      content="Drag-and-drop Kanban board with WIP limits, labels, due dates, checklists, undo/redo and JSON import/export. Vanilla JavaScript, works offline in your browser."
+    />
+    <meta property="og:url" content="https://celaldrg.github.io/kanban/" />
+    <meta property="og:image" content="https://celaldrg.github.io/kanban/docs/screenshot.png" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Crect x='6' y='7' width='5' height='18' rx='1.5' fill='%232dd4bf'/%3E%3Crect x='13.5' y='7' width='5' height='11' rx='1.5' fill='%232dd4bf' fill-opacity='.75'/%3E%3Crect x='21' y='7' width='5' height='14' rx='1.5' fill='%232dd4bf' fill-opacity='.5'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="src/main.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#board" data-i18n="skipToBoard">Skip to the board</a>
+
+    <header class="site-header">
+      <div class="brand">
+        <i data-icon="logo" class="brand-logo"></i>
+        <h1 class="brand-title" data-i18n="appTitle">Kanban Board</h1>
+      </div>
+      <div class="header-actions">
+        <button id="undo" type="button" class="btn header-btn" aria-disabled="true" aria-keyshortcuts="Control+Z" data-i18n-attr="title:undoHint">
+          <i data-icon="undo"></i><span class="btn-text" data-i18n="undo">Undo</span>
+        </button>
+        <button
+          id="redo"
+          type="button"
+          class="btn header-btn"
+          aria-disabled="true"
+          aria-keyshortcuts="Control+Y Control+Shift+Z"
+          data-i18n-attr="title:redoHint"
+        >
+          <i data-icon="redo"></i><span class="btn-text" data-i18n="redo">Redo</span>
+        </button>
+        <button id="menu-button" type="button" class="btn header-btn" aria-haspopup="dialog">
+          <i data-icon="menu"></i><span class="btn-text" data-i18n="boardMenu">Board</span>
+        </button>
+        <button id="lang-toggle" type="button" class="btn lang-toggle" data-i18n="langButton" data-i18n-attr="aria-label:langSwitch">TR</button>
+      </div>
+    </header>
+
+    <div id="toolbar" class="toolbar">
+      <div class="toolbar-row">
+        <label class="search">
+          <i data-icon="search" class="search-icon"></i>
+          <input id="search" type="search" autocomplete="off" spellcheck="false" data-i18n-attr="aria-label:searchLabel;placeholder:searchPlaceholder" />
+        </label>
+        <button id="filters-toggle" type="button" class="btn filters-toggle" aria-expanded="false" aria-controls="filter-panel">
+          <i data-icon="filter"></i><span data-i18n="filters">Filters</span>
+          <span id="filters-count" class="filters-count" hidden></span>
+        </button>
+      </div>
+      <div id="filter-panel" class="filter-panel">
+        <div id="label-filters" class="chip-group" role="group" data-i18n-attr="aria-label:labelFilters"></div>
+        <div id="due-filters" class="chip-group" role="group" data-i18n-attr="aria-label:dueFilters"></div>
+        <button id="clear-filters" type="button" class="btn btn--ghost clear-filters" hidden data-i18n-attr="aria-label:clearFiltersLabel">
+          <i data-icon="close"></i><span data-i18n="clearFilters">Clear</span>
+        </button>
+      </div>
+      <p id="match-count" class="match-count" aria-live="polite"></p>
+    </div>
+
+    <main class="board-wrap">
+      <div id="board" class="board" tabindex="-1" role="region" data-i18n-attr="aria-label:boardRegion"></div>
+    </main>
+
+    <footer class="site-footer">
+      MIT · <a href="https://github.com/celaldrg/kanban" data-i18n="footerSource">Source on GitHub</a>
+    </footer>
+
+    <p id="card-help" class="visually-hidden" data-i18n="cardHelp"></p>
+    <div id="toasts" class="toasts"></div>
+    <div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+    <input id="import-file" type="file" accept=".json,application/json" hidden data-i18n-attr="aria-label:importJson" />
+
+    <dialog id="card-dialog" class="dialog" aria-labelledby="card-dialog-title">
+      <form class="dialog-form" novalidate>
+        <header class="dialog-head">
+          <div class="dialog-heading">
+            <h2 id="card-dialog-title" class="dialog-title"></h2>
+            <p id="card-column" class="dialog-sub"></p>
+          </div>
+          <button type="button" class="icon-btn" data-close data-i18n-attr="aria-label:close;title:close"><i data-icon="close"></i></button>
+        </header>
+        <div class="dialog-body">
+          <div class="field">
+            <label for="card-title" data-i18n="fieldTitle"></label>
+            <input id="card-title" type="text" autocomplete="off" required aria-describedby="card-error" />
+          </div>
+          <fieldset class="field">
+            <legend data-i18n="fieldLabels"></legend>
+            <div id="card-labels" class="label-picker"></div>
+          </fieldset>
+          <div class="field">
+            <label for="card-due" data-i18n="fieldDue"></label>
+            <div class="due-row">
+              <input id="card-due" type="date" />
+              <button id="card-due-clear" type="button" class="btn btn--ghost" data-i18n-attr="aria-label:clearDueLabel">
+                <span data-i18n="clearDue"></span>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="card-description" data-i18n="fieldDescription"></label>
+            <textarea id="card-description" rows="4" data-i18n-attr="placeholder:descriptionPlaceholder"></textarea>
+          </div>
+          <fieldset class="field">
+            <legend data-i18n="fieldChecklist"></legend>
+            <div id="checklist-progress" class="progress" hidden>
+              <span class="progress-bar" aria-hidden="true"><span class="progress-fill"></span></span>
+              <span id="checklist-count" class="progress-count" aria-hidden="true"></span>
+              <span id="checklist-summary" class="visually-hidden"></span>
+            </div>
+            <ul id="checklist" class="checklist"></ul>
+            <div class="checklist-new">
+              <input id="checklist-new" type="text" autocomplete="off" data-i18n-attr="placeholder:newItemPlaceholder;aria-label:newItemLabel" />
+              <button id="checklist-add" type="button" class="btn"><i data-icon="plus"></i><span data-i18n="addItem"></span></button>
+            </div>
+            <p id="checklist-hint" class="hint" hidden></p>
+          </fieldset>
+          <p id="card-error" class="form-error" role="alert" hidden></p>
+          <p id="card-meta" class="dialog-meta" hidden></p>
+        </div>
+        <footer class="dialog-foot">
+          <div id="card-actions" class="dialog-foot-start">
+            <button id="card-archive" type="button" class="btn btn--ghost"><i data-icon="archive"></i><span data-i18n="archive"></span></button>
+            <button id="card-delete" type="button" class="btn btn--danger"><i data-icon="trash"></i><span data-i18n="delete"></span></button>
+          </div>
+          <div class="dialog-foot-end">
+            <button type="button" class="btn btn--ghost" data-close data-i18n="cancel"></button>
+            <button id="card-save" type="submit" class="btn btn--primary"></button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="column-dialog" class="dialog dialog--narrow" aria-labelledby="column-dialog-title">
+      <form class="dialog-form" novalidate>
+        <header class="dialog-head">
+          <h2 id="column-dialog-title" class="dialog-title"></h2>
+          <button type="button" class="icon-btn" data-close data-i18n-attr="aria-label:close;title:close"><i data-icon="close"></i></button>
+        </header>
+        <div class="dialog-body">
+          <div class="field">
+            <label for="column-name" data-i18n="columnName"></label>
+            <input id="column-name" type="text" autocomplete="off" required aria-describedby="column-error" />
+          </div>
+          <div class="field">
+            <label for="column-wip" data-i18n="wipLimit"></label>
+            <input id="column-wip" type="number" inputmode="numeric" min="0" step="1" aria-describedby="column-wip-hint column-error" />
+            <p id="column-wip-hint" class="hint" data-i18n="wipHint"></p>
+          </div>
+          <div id="column-position-field" class="field position-field">
+            <p id="column-position" class="position-text" aria-live="polite"></p>
+            <div class="position-buttons">
+              <button id="column-left" type="button" class="btn"><i data-icon="left"></i><span data-i18n="moveLeft"></span></button>
+              <button id="column-right" type="button" class="btn"><span data-i18n="moveRight"></span><i data-icon="right"></i></button>
+            </div>
+          </div>
+          <p id="column-error" class="form-error" role="alert" hidden></p>
+        </div>
+        <footer class="dialog-foot">
+          <div class="dialog-foot-start">
+            <button id="column-delete" type="button" class="btn btn--danger"><i data-icon="trash"></i><span data-i18n="deleteColumn"></span></button>
+          </div>
+          <div class="dialog-foot-end">
+            <button type="button" class="btn btn--ghost" data-close data-i18n="cancel"></button>
+            <button id="column-save" type="submit" class="btn btn--primary"></button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="archive-dialog" class="dialog" aria-labelledby="archive-title" data-backdrop-close>
+      <div class="dialog-form">
+        <header class="dialog-head">
+          <h2 id="archive-title" class="dialog-title" data-i18n="archiveTitle"></h2>
+          <button type="button" class="icon-btn" data-close data-i18n-attr="aria-label:close;title:close"><i data-icon="close"></i></button>
+        </header>
+        <div class="dialog-body">
+          <ul id="archive-list" class="archive-list"></ul>
+          <p id="archive-empty" class="empty-note" data-i18n="archiveEmpty"></p>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="menu-dialog" class="dialog dialog--menu" aria-labelledby="menu-title" data-backdrop-close>
+      <div class="dialog-form">
+        <header class="dialog-head">
+          <h2 id="menu-title" class="dialog-title" data-i18n="boardMenu"></h2>
+          <button type="button" class="icon-btn" data-close data-i18n-attr="aria-label:close;title:close"><i data-icon="close"></i></button>
+        </header>
+        <div class="menu-list">
+          <button id="menu-archive" type="button" class="menu-item"><i data-icon="archive"></i><span id="menu-archive-text"></span></button>
+          <button id="menu-export" type="button" class="menu-item"><i data-icon="download"></i><span data-i18n="exportJson"></span></button>
+          <button id="menu-import" type="button" class="menu-item"><i data-icon="upload"></i><span data-i18n="importJson"></span></button>
+          <button id="menu-reset" type="button" class="menu-item menu-item--danger"><i data-icon="reset"></i><span data-i18n="resetBoard"></span></button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="dialog dialog--narrow" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <form method="dialog" class="dialog-form">
+        <div class="dialog-body confirm-body">
+          <h2 id="confirm-title" class="dialog-title"></h2>
+          <p id="confirm-message" class="confirm-message"></p>
+        </div>
+        <footer class="dialog-foot">
+          <div class="dialog-foot-end">
+            <button value="cancel" class="btn btn--ghost" data-i18n="cancel"></button>
+            <button id="confirm-ok" value="confirm" class="btn btn--danger"></button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+  </body>
+</html>

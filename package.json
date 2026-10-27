@@ -1,0 +1,11 @@
+{
+  "name": "kanban",
+  "version": "1.0.0",
+  "description": "A Kanban board in vanilla JavaScript with drag and drop, WIP limits, undo/redo, Turkish-aware search and JSON import/export.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
