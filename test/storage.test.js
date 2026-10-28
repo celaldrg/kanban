@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createBoard } from '../src/model.js';
-import { loadBoard, saveBoard } from '../src/persist.js';
+import { boardFromStorageEvent, loadBoard, saveBoard } from '../src/persist.js';
 import { reduce } from '../src/reducer.js';
 import { readItem, writeItem } from '../src/storage.js';
 
@@ -129,4 +129,21 @@ test('loadBoard migrates data saved by schema v1', () => {
     updatedAt: 7,
   });
   assert.equal(storage.data.has('kanban:board-unreadable'), false, 'readable data needs no backup');
+});
+
+test('boardFromStorageEvent reads the board another tab saved', () => {
+  const storage = memoryStorage();
+  const board = smallBoard();
+  saveBoard(board, storage);
+  const newValue = storage.data.get('kanban:board');
+  assert.deepEqual(boardFromStorageEvent({ key: 'kanban:board', newValue }), board);
+});
+
+test('boardFromStorageEvent ignores other keys, cleared keys and unreadable data', () => {
+  const newValue = JSON.stringify({ hello: 1 });
+  assert.equal(boardFromStorageEvent({ key: 'kanban:lang', newValue: 'tr' }), null);
+  assert.equal(boardFromStorageEvent({ key: 'kanban:board', newValue: null }), null);
+  assert.equal(boardFromStorageEvent({ key: null, newValue: null }), null);
+  assert.equal(boardFromStorageEvent({ key: 'kanban:board', newValue: '{oops' }), null);
+  assert.equal(boardFromStorageEvent({ key: 'kanban:board', newValue }), null);
 });

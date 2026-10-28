@@ -4,7 +4,7 @@
  */
 
 import { parseBoard, stringifyBoard } from './schema.js';
-import { readItem, writeItem } from './storage.js';
+import { readItem, storageKey, writeItem } from './storage.js';
 
 /**
  * @typedef {import('./model.js').Board} Board
@@ -64,4 +64,16 @@ function backUp(text, backend) {
  */
 export function saveBoard(board, backend) {
   return writeItem(BOARD_KEY, stringifyBoard(board), backend);
+}
+
+/**
+ * The board another tab just saved, read from a "storage" event. Events for other keys, a cleared
+ * key and data that cannot be read give null, so the board shown is kept.
+ * @param {{ key: string|null, newValue: string|null }} event
+ * @returns {Board|null}
+ */
+export function boardFromStorageEvent(event) {
+  if (event.key !== storageKey(BOARD_KEY) || event.newValue === null) return null;
+  const result = parseBoard(event.newValue);
+  return result.ok ? result.board : null;
 }

@@ -15,7 +15,7 @@ import { applyTranslations, hydrateIcons, isTypingTarget } from './dom.js';
 import { createFeedback } from './feedback.js';
 import { LANGUAGES, translate } from './i18n.js';
 import { findColumn } from './model.js';
-import { loadBoard, saveBoard } from './persist.js';
+import { boardFromStorageEvent, loadBoard, saveBoard } from './persist.js';
 import { createDemoBoard, createSampleBoard } from './sample.js';
 import { createMatcher, isFilterActive } from './search.js';
 import { readItem, writeItem } from './storage.js';
@@ -55,6 +55,7 @@ const state = {
   undoTarget: null, // the board an Undo toast belongs to; any other board hides that toast
   saving: false, // off for the demo board, and when saved data can be neither read nor backed up
   saveWarned: false,
+  externalBoard: null, // a board another tab saved, waiting for a drag here to finish
 };
 
 /** @type {AppContext} */
@@ -100,6 +101,7 @@ function start() {
   wireHeader();
   wireBoardMenu();
   document.addEventListener('keydown', onShortcut);
+  window.addEventListener('storage', onStorage);
   const saved = loadSavedBoard();
   useBoard(saved ?? readyMadeBoard(), saved === null);
   applyLanguage();
@@ -153,6 +155,32 @@ function onBoardChange(board) {
     showToast(t('saveFailed'), 'error');
   }
   renderAll();
+}
+
+/**
+ * Another tab saved the board: show that version, so that the next save here does not silently
+ * overwrite it. Undo history starts over, because undoing would bring the other tab's work back
+ * out. A drag or keyboard move in progress finishes first.
+ */
+function onStorage(event) {
+  if (state.demo || !state.saving) return;
+  const board = boardFromStorageEvent(event);
+  if (!board) return;
+  const waiting = state.externalBoard !== null;
+  state.externalBoard = board; // only the latest one counts
+  if (!waiting) adoptExternalBoard();
+}
+
+function adoptExternalBoard() {
+  if (view.isBusy()) {
+    setTimeout(adoptExternalBoard, 250);
+    return;
+  }
+  const board = state.externalBoard;
+  state.externalBoard = null;
+  useBoard(board, false);
+  renderAll();
+  showToast(t('changedElsewhere'));
 }
 
 function renderAll() {

@@ -52,3 +52,12 @@ export function writeItem(key, value, backend) {
     return false;
   }
 }
+
+/**
+ * The full storage key for a name, as other tabs see it in a "storage" event.
+ * @param {string} key name without the app prefix
+ * @returns {string}
+ */
+export function storageKey(key) {
+  return PREFIX + key;
+}
